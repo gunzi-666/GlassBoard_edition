@@ -2374,6 +2374,11 @@ public class Controller
 				draft.ShowRunning = showRunning;
 				live();
 			});
+			func3(stackPanel3, "鼠标悬停时列出该软件的多个窗口，点击切换", draft.HoverWindowList, delegate(bool hoverWindowList)
+			{
+				draft.HoverWindowList = hoverWindowList;
+				live();
+			});
 			func3(stackPanel3, "Dock 自动隐藏，靠近所在屏幕底边唤出", draft.AutoHide, delegate(bool autoHide)
 			{
 				draft.AutoHide = autoHide;

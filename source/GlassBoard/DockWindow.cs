@@ -81,6 +81,24 @@ public class DockWindow : GlassWindow
 
 	private System.Windows.Controls.ContextMenu taskMenu;
 
+	private readonly DispatcherTimer hoverOpenTimer = new DispatcherTimer
+	{
+		Interval = TimeSpan.FromMilliseconds(450.0)
+	};
+
+	private readonly DispatcherTimer hoverCloseTimer = new DispatcherTimer
+	{
+		Interval = TimeSpan.FromMilliseconds(120.0)
+	};
+
+	private FrameworkElement hoverOwner;
+
+	private Func<List<RunningWindow>> hoverWindows;
+
+	private Popup hoverPopup;
+
+	private DateTime hoverLeftAt;
+
 	private Controller C;
 
 	private StackPanel Items = new StackPanel
@@ -1033,6 +1051,15 @@ public class DockWindow : GlassWindow
 			taskHintTimer.Stop();
 			taskHint.Visibility = Visibility.Collapsed;
 		};
+		hoverOpenTimer.Tick += delegate
+		{
+			hoverOpenTimer.Stop();
+			OpenHoverWindows();
+		};
+		hoverCloseTimer.Tick += delegate
+		{
+			TrackHoverWindows();
+		};
 		AddHandler(Mouse.PreviewMouseWheelEvent, (MouseWheelEventHandler)delegate(object s, MouseWheelEventArgs e)
 		{
 			if (!DockInputBusy && !dragging && !externalDockDrag)
@@ -1093,6 +1120,7 @@ public class DockWindow : GlassWindow
 		base.Closed += delegate
 		{
 			taskHintTimer.Stop();
+			CloseHoverWindows();
 			if (taskMenu != null)
 			{
 				taskMenu.IsOpen = false;
@@ -1208,7 +1236,7 @@ public class DockWindow : GlassWindow
 
 	private void RefreshTaskSnapshot()
 	{
-		if (taskWheel.Running && !DockInputBusy && !externalDockDrag && !dragging && !C.Board.ModalBusy && (taskMenu == null || !taskMenu.IsOpen) && (base.ContextMenu == null || !base.ContextMenu.IsOpen) && !Items.Children.OfType<System.Windows.Controls.Button>().Any((System.Windows.Controls.Button b) => b.IsMouseOver || (b.ContextMenu != null && b.ContextMenu.IsOpen)) && !(taskSignature == TaskSignature()))
+		if (taskWheel.Running && !DockInputBusy && !externalDockDrag && !dragging && !C.Board.ModalBusy && (taskMenu == null || !taskMenu.IsOpen) && !HoverWindowsOpen && (base.ContextMenu == null || !base.ContextMenu.IsOpen) && !Items.Children.OfType<System.Windows.Controls.Button>().Any((System.Windows.Controls.Button b) => b.IsMouseOver || (b.ContextMenu != null && b.ContextMenu.IsOpen)) && !(taskSignature == TaskSignature()))
 		{
 			ReadTaskGroups();
 			Refresh(capture: false);
@@ -1245,6 +1273,14 @@ public class DockWindow : GlassWindow
 				});
 			}
 			button.ContextMenu = TaskWindowMenu(item);
+			BindHoverWindows(button, delegate
+			{
+				RunningWindows.Scan();
+				return (from w in RunningWindows.Snapshot()
+					where string.Equals(TaskKey(w), selected.Key, StringComparison.OrdinalIgnoreCase)
+					orderby w.Handle.ToInt64()
+					select w).ToList();
+			});
 			Items.Children.Add(button);
 		}
 		if (taskGroups.Count > shown && slots > 0)
@@ -1345,6 +1381,190 @@ public class DockWindow : GlassWindow
 		ReadTaskGroups();
 		Refresh(capture: false);
 		ShowTaskHint("此窗口已关闭");
+	}
+
+	private bool HoverWindowsOpen => hoverPopup != null && hoverPopup.IsOpen;
+
+	private void BindHoverWindows(FrameworkElement owner, Func<List<RunningWindow>> windows)
+	{
+		owner.MouseEnter += delegate
+		{
+			if (HoverWindowsOpen && hoverOwner != owner)
+			{
+				CloseHoverWindows();
+			}
+			if (!HoverWindowsOpen && C.Prefs.Dock.HoverWindowList && !DockInputBusy && !dragging && !dockIconDragging && !externalDockDrag && !renderedHidden)
+			{
+				hoverOwner = owner;
+				hoverWindows = windows;
+				hoverOpenTimer.Stop();
+				hoverOpenTimer.Start();
+			}
+		};
+		owner.MouseLeave += delegate
+		{
+			if (hoverOwner == owner && !HoverWindowsOpen)
+			{
+				hoverOpenTimer.Stop();
+				hoverOwner = null;
+				hoverWindows = null;
+			}
+		};
+		owner.AddHandler(Mouse.PreviewMouseDownEvent, (MouseButtonEventHandler)delegate
+		{
+			CloseHoverWindows();
+		}, handledEventsToo: true);
+	}
+
+	private void OpenHoverWindows()
+	{
+		FrameworkElement owner = hoverOwner;
+		Func<List<RunningWindow>> windows = hoverWindows;
+		if (owner == null || windows == null || !owner.IsMouseOver || !owner.IsVisible || DockInputBusy || dragging || dockIconDragging || externalDockDrag || C.Board.ModalBusy || (taskMenu != null && taskMenu.IsOpen) || (owner.ContextMenu != null && owner.ContextMenu.IsOpen))
+		{
+			return;
+		}
+		List<RunningWindow> list = windows();
+		if (list.Count < 2)
+		{
+			return;
+		}
+		bool light = C.Prefs.Light;
+		System.Windows.Media.Brush ink = Polish.Ink(light);
+		System.Windows.Media.Brush hover = Polish.Color(light ? "#DFEAFE" : "#3A5074");
+		StackPanel rows = new StackPanel();
+		foreach (RunningWindow window in list)
+		{
+			RunningWindow selected = window;
+			StackPanel line = new StackPanel
+			{
+				Orientation = System.Windows.Controls.Orientation.Horizontal
+			};
+			line.Children.Add(new System.Windows.Controls.Image
+			{
+				Source = RunningWindows.Icon(selected),
+				Width = 16.0,
+				Height = 16.0,
+				Margin = new Thickness(0.0, 0.0, 10.0, 0.0),
+				VerticalAlignment = VerticalAlignment.Center
+			});
+			line.Children.Add(new TextBlock
+			{
+				Text = (string.IsNullOrWhiteSpace(selected.Title) ? "未命名窗口" : selected.Title),
+				Foreground = ink,
+				FontSize = 13.0,
+				MaxWidth = 380.0,
+				TextTrimming = TextTrimming.CharacterEllipsis,
+				VerticalAlignment = VerticalAlignment.Center
+			});
+			Border row = new Border
+			{
+				Background = System.Windows.Media.Brushes.Transparent,
+				CornerRadius = new CornerRadius(6.0),
+				Padding = new Thickness(10.0, 8.0, 12.0, 8.0),
+				Cursor = System.Windows.Input.Cursors.Hand,
+				ToolTip = selected.Title,
+				Child = line
+			};
+			row.MouseEnter += delegate
+			{
+				row.Background = hover;
+			};
+			row.MouseLeave += delegate
+			{
+				row.Background = System.Windows.Media.Brushes.Transparent;
+			};
+			row.MouseLeftButtonUp += delegate
+			{
+				CloseHoverWindows();
+				ActivateTask(selected.Handle);
+			};
+			rows.Children.Add(row);
+		}
+		Popup popup = new Popup
+		{
+			AllowsTransparency = true,
+			StaysOpen = true,
+			Focusable = false,
+			Placement = PlacementMode.Top,
+			PlacementTarget = owner,
+			VerticalOffset = -6.0,
+			PopupAnimation = PopupAnimation.Fade,
+			Child = new Border
+			{
+				Background = Polish.Color(light ? "#FAFCFF" : "#202B3D"),
+				BorderBrush = Polish.Color(light ? "#CFD7E5" : "#48566D"),
+				BorderThickness = new Thickness(1.0),
+				CornerRadius = new CornerRadius(10.0),
+				Padding = new Thickness(5.0),
+				SnapsToDevicePixels = true,
+				Child = new ScrollViewer
+				{
+					MaxHeight = 420.0,
+					VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+					HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+					Content = rows
+				}
+			}
+		};
+		hoverPopup = popup;
+		hoverLeftAt = DateTime.MinValue;
+		popup.IsOpen = true;
+		hoverCloseTimer.Start();
+	}
+
+	private void TrackHoverWindows()
+	{
+		Popup popup = hoverPopup;
+		FrameworkElement owner = hoverOwner;
+		if (popup == null || !popup.IsOpen || owner == null || !owner.IsVisible || PresentationSource.FromVisual(owner) == null || DockInputBusy || dragging || renderedHidden)
+		{
+			CloseHoverWindows();
+			return;
+		}
+		Rect area = Rect.Union(ScreenBounds(owner), ScreenBounds(popup.Child as FrameworkElement));
+		if (area.IsEmpty)
+		{
+			CloseHoverWindows();
+			return;
+		}
+		area.Inflate(8.0, 8.0);
+		System.Drawing.Point position = System.Windows.Forms.Cursor.Position;
+		if (area.Contains(position.X, position.Y))
+		{
+			hoverLeftAt = DateTime.MinValue;
+		}
+		else if (hoverLeftAt == DateTime.MinValue)
+		{
+			hoverLeftAt = DateTime.UtcNow;
+		}
+		else if ((DateTime.UtcNow - hoverLeftAt).TotalMilliseconds >= 350.0)
+		{
+			CloseHoverWindows();
+		}
+	}
+
+	private static Rect ScreenBounds(FrameworkElement element)
+	{
+		if (element == null || PresentationSource.FromVisual(element) == null)
+		{
+			return Rect.Empty;
+		}
+		return new Rect(element.PointToScreen(new System.Windows.Point(0.0, 0.0)), element.PointToScreen(new System.Windows.Point(element.ActualWidth, element.ActualHeight)));
+	}
+
+	private void CloseHoverWindows()
+	{
+		hoverOpenTimer.Stop();
+		hoverCloseTimer.Stop();
+		Popup popup = hoverPopup;
+		hoverPopup = null;
+		hoverOwner = null;
+		hoverWindows = null;
+		if (popup != null)
+		{
+			popup.IsOpen = false;
+		}
 	}
 
 	private static string[] DockPayload(System.Windows.IDataObject data)
@@ -1604,6 +1824,7 @@ public class DockWindow : GlassWindow
 		autoTimer.Stop();
 		runningTimer.Stop();
 		taskHintTimer.Stop();
+		CloseHoverWindows();
 		SystemEvents.DisplaySettingsChanged -= DisplayChanged;
 	}
 
@@ -1694,6 +1915,11 @@ public class DockWindow : GlassWindow
 				}, a.Name, a);
 				button.ContextMenu = C.Menu(a, "Dock");
 				AddDockControls(button.ContextMenu);
+				BindHoverWindows(button, delegate
+				{
+					RunningWindows.Scan();
+					return RunningWindows.For(a);
+				});
 				Items.Children.Add(button);
 			}
 			if (list.Count > num3 && num2 > 0)
@@ -1818,7 +2044,7 @@ public class DockWindow : GlassWindow
 			bool over = !renderedHidden && point.X >= base.Left && point.X <= base.Left + base.Width && point.Y >= shownTop && point.Y <= shownTop + base.Height;
 			bool edge = point.X >= base.Left - 12.0 && point.X <= base.Left + base.Width + 12.0 && point.Y >= bottom - C.Prefs.Dock.EdgeRange;
 			bool flag = (base.ContextMenu != null && base.ContextMenu.IsOpen) || Items.Children.OfType<System.Windows.Controls.Button>().Any((System.Windows.Controls.Button b) => b.ContextMenu != null && b.ContextMenu.IsOpen);
-			bool flag2 = hidePolicy.Update(DateTime.UtcNow, C.Prefs.Dock.AutoHide, over, edge, dragging || DockInputBusy || externalDockDrag || (taskMenu != null && taskMenu.IsOpen) || flag || C.UiBusy || C.Board.IsVisible, C.Prefs.Dock.HideDelay);
+			bool flag2 = hidePolicy.Update(DateTime.UtcNow, C.Prefs.Dock.AutoHide, over, edge, dragging || DockInputBusy || externalDockDrag || (taskMenu != null && taskMenu.IsOpen) || HoverWindowsOpen || flag || C.UiBusy || C.Board.IsVisible, C.Prefs.Dock.HideDelay);
 			if (flag2 != renderedHidden)
 			{
 				renderedHidden = flag2;

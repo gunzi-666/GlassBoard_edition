@@ -62,6 +62,9 @@ public class DockOptions
 	public bool ShowRunning = true;
 
 	[DataMember]
+	public bool HoverWindowList = true;
+
+	[DataMember]
 	public bool SpringReveal = true;
 
 	[DataMember]
@@ -123,6 +126,7 @@ public class DockOptions
 		RunningOrder = new List<string>();
 		AutoHide = false;
 		ShowRunning = true;
+		HoverWindowList = true;
 		SpringReveal = true;
 		ShowShortcutOverlays = false;
 		SharperIcons = false;
