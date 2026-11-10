@@ -10,13 +10,22 @@ namespace GlassBoard;
 
 public static class UpdateRules
 {
-	public const string Repository = "https://github.com/xinxiao1011/GlassBoard";
+	// 格式为「用户名/仓库名」，检查更新、下载地址和信任校验都由它派生。
+	public const string RepositoryPath = "gunzi-666/GlassBoard_edition";
 
-	public const string Api = "https://api.github.com/repos/xinxiao1011/GlassBoard";
+	public const string Branch = "main";
 
-	public const string Manifest = "https://raw.githubusercontent.com/xinxiao1011/GlassBoard/main/update.json";
+	public const string Repository = "https://github.com/" + RepositoryPath;
 
-	public const string ManifestFallback = "https://github.com/xinxiao1011/GlassBoard/raw/refs/heads/main/update.json";
+	public const string Api = "https://api.github.com/repos/" + RepositoryPath;
+
+	public const string RawRoot = "https://raw.githubusercontent.com/" + RepositoryPath + "/" + Branch + "/";
+
+	public const string RawFallbackRoot = "https://github.com/" + RepositoryPath + "/raw/refs/heads/" + Branch + "/";
+
+	public const string Manifest = RawRoot + "update.json";
+
+	public const string ManifestFallback = RawFallbackRoot + "update.json";
 
 	public const long MaxArchive = 201326592L;
 
@@ -29,11 +38,11 @@ public static class UpdateRules
 
 	public static string Alternate(string url)
 	{
-		if (url == null || !url.StartsWith("https://raw.githubusercontent.com/xinxiao1011/GlassBoard/main/", StringComparison.OrdinalIgnoreCase))
+		if (url == null || !url.StartsWith(RawRoot, StringComparison.OrdinalIgnoreCase))
 		{
 			return null;
 		}
-		return "https://github.com/xinxiao1011/GlassBoard/raw/refs/heads/main/" + url.Substring("https://raw.githubusercontent.com/xinxiao1011/GlassBoard/main/".Length);
+		return RawFallbackRoot + url.Substring(RawRoot.Length);
 	}
 
 	public static Version PackageVersion(string name)
@@ -52,11 +61,11 @@ public static class UpdateRules
 		{
 			return false;
 		}
-		if (!result.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase) || !result.AbsolutePath.StartsWith("/xinxiao1011/GlassBoard/releases/download/", StringComparison.OrdinalIgnoreCase))
+		if (!result.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase) || !result.AbsolutePath.StartsWith("/" + RepositoryPath + "/releases/download/", StringComparison.OrdinalIgnoreCase))
 		{
 			if (result.Host.Equals("raw.githubusercontent.com", StringComparison.OrdinalIgnoreCase))
 			{
-				return result.AbsolutePath.StartsWith("/xinxiao1011/GlassBoard/", StringComparison.OrdinalIgnoreCase);
+				return result.AbsolutePath.StartsWith("/" + RepositoryPath + "/", StringComparison.OrdinalIgnoreCase);
 			}
 			return false;
 		}

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 using System.Runtime.Serialization.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,7 +18,7 @@ public static class UpdateService
 	{
 		token.ThrowIfCancellationRequested();
 		HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-		request.UserAgent = "GlassBoard-updater/0.9.12";
+		request.UserAgent = "GlassBoard-updater/" + Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
 		request.Accept = "application/vnd.github+json";
 		request.Timeout = ((progress == null) ? 12000 : 120000);
 		request.ReadWriteTimeout = ((progress == null) ? 12000 : 30000);
@@ -128,7 +129,13 @@ public static class UpdateService
 
 	public static UpdateOffer CheckUsing(Func<string, long, byte[]> read)
 	{
-		string[] array = new string[4] { "https://api.github.com/repos/xinxiao1011/GlassBoard/releases?per_page=20", "https://api.github.com/repos/xinxiao1011/GlassBoard/contents", "https://raw.githubusercontent.com/xinxiao1011/GlassBoard/main/update.json", "https://github.com/xinxiao1011/GlassBoard/raw/refs/heads/main/update.json" };
+		string[] array = new string[4]
+		{
+			UpdateRules.Api + "/releases?per_page=20",
+			UpdateRules.Api + "/contents?ref=" + UpdateRules.Branch,
+			UpdateRules.Manifest,
+			UpdateRules.ManifestFallback
+		};
 		List<UpdateOffer> list = new List<UpdateOffer>();
 		List<string> list2 = new List<string>();
 		int num = 0;

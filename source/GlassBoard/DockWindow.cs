@@ -1611,11 +1611,18 @@ public class DockWindow : GlassWindow
 	{
 		switch (msg)
 		{
-		case 32815:
+		case Native.RestoreMessage:
 			handled = true;
 			base.Dispatcher.BeginInvoke((Action)delegate
 			{
 				C.ShellAction(3);
+			});
+			return IntPtr.Zero;
+		case Native.RecoverWidgetsMessage:
+			handled = true;
+			base.Dispatcher.BeginInvoke((Action)delegate
+			{
+				C.RecoverWidgets();
 			});
 			return IntPtr.Zero;
 		}

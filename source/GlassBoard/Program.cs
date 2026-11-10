@@ -47,7 +47,17 @@ public static class Program
 		{
 			if (!createdNew)
 			{
-				MessageBox.Show("已有 GlassBoard 在运行，本次启动的 v0.9.17 尚未运行。\n请先从托盘退出已有程序，再启动此版本。", "GlassBoard v0.9.17");
+				if (args.Any((string a) => a == "--recover-widgets"))
+				{
+					if (Native.RequestRecoverWidgets())
+					{
+						return 0;
+					}
+					MessageBox.Show("已有 GlassBoard 在运行，但未找到它的 Dock 窗口。\n请从托盘右键选择「恢复并开启全部组件」，或退出后重新运行 RecoverWidgets.cmd。", "GlassBoard");
+					return 1;
+				}
+				string version = "v" + Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
+				MessageBox.Show("已有 GlassBoard 在运行，本次启动的 " + version + " 尚未运行。\n请先从托盘退出已有程序，再启动此版本。", "GlassBoard " + version);
 				return 0;
 			}
 			try

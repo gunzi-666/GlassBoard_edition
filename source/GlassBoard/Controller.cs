@@ -1285,7 +1285,7 @@ public class Controller
 		glassSuppressed = FullscreenState.Active();
 		Tray = new NotifyIcon
 		{
-			Text = "GlassBoard v0.9.17 · 玻璃启动台",
+			Text = "GlassBoard v" + CurrentVersion.ToString(3) + " · 玻璃启动台",
 			Icon = (Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location) ?? SystemIcons.Application),
 			Visible = true
 		};
@@ -1971,7 +1971,7 @@ public class Controller
 			Board.Hide();
 			Window w = new Window
 			{
-				Title = "GlassBoard · 个性化与控制 v0.9.17",
+				Title = "GlassBoard · 个性化与控制 v" + CurrentVersion.ToString(3),
 				Width = Math.Min(940.0, SystemParameters.WorkArea.Width - 40.0),
 				Height = Math.Min(790.0, SystemParameters.WorkArea.Height - 50.0),
 				MinWidth = 560.0,
@@ -3624,7 +3624,7 @@ public class Controller
 		}));
 		wrapPanel.Children.Add(FeatureUi.Button("查看发布仓库", delegate
 		{
-			Process.Start(new ProcessStartInfo("https://github.com/xinxiao1011/GlassBoard")
+			Process.Start(new ProcessStartInfo(UpdateRules.Repository)
 			{
 				UseShellExecute = true
 			});

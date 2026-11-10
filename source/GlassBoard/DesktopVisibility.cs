@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
 using System.Windows.Threading;
@@ -297,14 +298,23 @@ public static class DesktopVisibility
 		{
 			return;
 		}
-		using (FileStream stream = File.OpenRead(RecoveryFile))
+		List<ShellState> list;
+		try
 		{
-			foreach (ShellState item in (List<ShellState>)new DataContractJsonSerializer(typeof(List<ShellState>)).ReadObject(stream))
+			using FileStream stream = File.OpenRead(RecoveryFile);
+			list = (List<ShellState>)new DataContractJsonSerializer(typeof(List<ShellState>)).ReadObject(stream);
+		}
+		catch (SerializationException ex)
+		{
+			Store.Log(ex);
+			ShowAll();
+			return;
+		}
+		foreach (ShellState item in list ?? new List<ShellState>())
+		{
+			if (MatchesSaved(item))
 			{
-				if (MatchesSaved(item))
-				{
-					ShowWindow(new IntPtr(item.Handle), item.Visible ? 8 : 0);
-				}
+				ShowWindow(new IntPtr(item.Handle), item.Visible ? 8 : 0);
 			}
 		}
 		File.Delete(RecoveryFile);

@@ -28,6 +28,8 @@ public static class Native
 
 	public const int RestoreMessage = 32815;
 
+	public const int RecoverWidgetsMessage = 32816;
+
 	private static readonly BoundedCache<string, ImageSource> icons = new BoundedCache<string, ImageSource>(512, StringComparer.OrdinalIgnoreCase);
 
 	[DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -38,10 +40,20 @@ public static class Native
 
 	public static bool RequestRestore()
 	{
+		return PostToDock(RestoreMessage);
+	}
+
+	public static bool RequestRecoverWidgets()
+	{
+		return PostToDock(RecoverWidgetsMessage);
+	}
+
+	private static bool PostToDock(int message)
+	{
 		IntPtr intPtr = FindWindow(null, "GlassBoard Dock");
 		if (intPtr != IntPtr.Zero)
 		{
-			return PostMessage(intPtr, 32815, IntPtr.Zero, IntPtr.Zero);
+			return PostMessage(intPtr, message, IntPtr.Zero, IntPtr.Zero);
 		}
 		return false;
 	}

@@ -88,8 +88,14 @@ public static class TaskbarAutoHide
 	{
 		if (File.Exists(Journal))
 		{
-			uint num = uint.Parse(File.ReadAllText(Journal), CultureInfo.InvariantCulture);
-			Apply(FeatureRules.AutoHideState(State(), (num & 1) != 0));
+			if (uint.TryParse(File.ReadAllText(Journal).Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var result))
+			{
+				Apply(FeatureRules.AutoHideState(State(), (result & 1) != 0));
+			}
+			else
+			{
+				Store.Log(new InvalidDataException("任务栏自动隐藏记录已损坏，已丢弃：" + Journal));
+			}
 			File.Delete(Journal);
 		}
 	}

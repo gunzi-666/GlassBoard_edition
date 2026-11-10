@@ -26,16 +26,38 @@ public static class Store
 
 	public static string RecoveryMessage { get; private set; }
 
-	public static void Trace(string message)
+	private const long MaxLogSize = 1048576L;
+
+	private const int KeptLogArchives = 3;
+
+	private static void RotateLog(string path)
+	{
+		if (!File.Exists(path) || new FileInfo(path).Length <= MaxLogSize)
+		{
+			return;
+		}
+		File.Move(path, path + "." + DateTime.Now.Ticks);
+		string fileName = Path.GetFileName(path);
+		foreach (string item in Directory.GetFiles(Folder, fileName + ".*").Where((string f) => long.TryParse(Path.GetExtension(f).TrimStart('.'), out var _)).OrderByDescending(File.GetLastWriteTimeUtc)
+			.Skip(KeptLogArchives))
+		{
+			try
+			{
+				File.Delete(item);
+			}
+			catch
+			{
+			}
+		}
+	}
+
+	private static void AppendLog(string name, string message)
 	{
 		try
 		{
 			Directory.CreateDirectory(Folder);
-			string text = Path.Combine(Folder, "session.log");
-			if (File.Exists(text) && new FileInfo(text).Length > 1048576)
-			{
-				File.Move(text, text + "." + DateTime.Now.Ticks);
-			}
+			string text = Path.Combine(Folder, name);
+			RotateLog(text);
 			File.AppendAllText(text, DateTime.Now.ToString("s") + " [" + Assembly.GetExecutingAssembly().GetName().Version?.ToString() + "] " + message + Environment.NewLine);
 		}
 		catch
@@ -43,16 +65,14 @@ public static class Store
 		}
 	}
 
+	public static void Trace(string message)
+	{
+		AppendLog("session.log", message);
+	}
+
 	public static void Log(Exception ex)
 	{
-		try
-		{
-			Directory.CreateDirectory(Folder);
-			File.AppendAllText(Path.Combine(Folder, "error.log"), DateTime.Now.ToString("s") + " [" + Assembly.GetExecutingAssembly().GetName().Version?.ToString() + "] " + ex?.ToString() + Environment.NewLine);
-		}
-		catch
-		{
-		}
+		AppendLog("error.log", ex?.ToString());
 	}
 
 	private static byte[] Encode<T>(T value)

@@ -31,6 +31,7 @@ class WinDFix {
     [DllImport("user32.dll")] static extern bool UnhookWindowsHookEx(IntPtr hhk);
     [DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern IntPtr GetModuleHandle(string name);
+    [DllImport("user32.dll")] static extern short GetAsyncKeyState(int vk);
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
     [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
@@ -51,12 +52,11 @@ class WinDFix {
     [StructLayout(LayoutKind.Sequential)]
     struct MONITORINFO { public int cbSize; public RECT rcMonitor; public RECT rcWork; public uint dwFlags; }
 
-    static readonly string LogPath = @"D:\GlassBoard\patches\windfix.log";
+    static readonly string LogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "windfix.log");
     static readonly HashSet<string> ShellClasses = new HashSet<string>(StringComparer.Ordinal) {
         "Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd",
         "Windows.UI.Core.CoreWindow", "MultitaskingViewFrame", "ForegroundStaging"
     };
-    static bool winDown = false;
     static long lastTrigger = 0;
     static LowLevelKeyboardProc proc;
 
@@ -70,12 +70,9 @@ class WinDFix {
                 int msg = (int)wParam;
                 int vk = Marshal.ReadInt32(lParam);
                 bool isDown = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
-                bool isUp = msg == WM_KEYUP || msg == WM_SYSKEYUP;
 
-                if (isDown && (vk == VK_LWIN || vk == VK_RWIN)) winDown = true;
-                if (isUp && (vk == VK_LWIN || vk == VK_RWIN)) winDown = false;
-
-                if (isDown && vk == VK_D && winDown) {
+                // 锁屏或 UAC 安全桌面期间收不到 Win 键抬起，不能自己记录按下状态，只能实时查询
+                if (isDown && vk == VK_D && WinHeld()) {
                     long now = Environment.TickCount;
                     if (now - lastTrigger > 400) {
                         lastTrigger = now;
@@ -88,6 +85,10 @@ class WinDFix {
             Log("HOOK ERROR " + ex.GetType().Name + ": " + ex.Message);
         }
         return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
+    }
+
+    static bool WinHeld() {
+        return ((GetAsyncKeyState(VK_LWIN) | GetAsyncKeyState(VK_RWIN)) & 0x8000) != 0;
     }
 
     static bool IsCloaked(IntPtr h) {
