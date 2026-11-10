@@ -1,8 +1,7 @@
 {
-  "name": "GlassBoard_v0.9.17_User.zip",
-  "size": 265028,
-  "download_url": "https://raw.githubusercontent.com/xinxiao1011/GlassBoard/main/GlassBoard_v0.9.17_User.zip",
-  "digest": "sha256:fe1f53a6d7368cce8214b2a3a832ee400d4a5d9d407b4d3009aa9e39a13c63fe",
-  "sha": "40f7069a8f3d7504ab9923e7ed1b9d368cef8be5",
+  "name": "GlassBoard_v0.9.18_User.zip",
+  "size": 271409,
+  "browser_download_url": "https://github.com/gunzi-666/GlassBoard_edition/releases/download/v0.9.18/GlassBoard_v0.9.18_User.zip",
+  "digest": "sha256:cbd1cec8b59161443e957a20f175dba6f1e3076d4626f5afdb2b1b8156566d99",
   "type": "file"
 }
