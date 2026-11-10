@@ -4,6 +4,10 @@
 
 Interop.UIAutomationClient.dll: Microsoft UI Automation interop assembly, bundled for the in-app self-check and UI reading. No upstream source is bundled.
 
+ManagedShell 0.0.374 (https://github.com/cairoshell/ManagedShell), Copyright (c) the ManagedShell contributors (cairoshell), licensed under the Apache License 2.0 (http://www.apache.org/licenses/LICENSE-2.0). Used unmodified for the tray bar. Its assemblies are embedded in GlassBoard.exe and extracted to %LOCALAPPDATA%\GlassBoard\runtime at run time.
+
+ManagedShell dependencies embedded the same way, from Microsoft under the MIT License (https://github.com/dotnet/runtime/blob/main/LICENSE.TXT): System.Data.OleDb, System.Diagnostics.EventLog, System.Security.Principal.Windows, System.ServiceProcess.ServiceController.
+
 Other reviewed projects (no source copied):
 https://github.com/DubyaDude/WindowsMediaController
 https://github.com/ModernFlyouts-Community/ModernFlyouts

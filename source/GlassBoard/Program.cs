@@ -12,6 +12,7 @@ public static class Program
 	[STAThread]
 	public static int Main(string[] args)
 	{
+		EmbeddedAssemblies.Install();
 		if (args.Length != 0 && args[0] == "--self-test")
 		{
 			return SelfTest.Run();
@@ -33,7 +34,8 @@ public static class Program
 					Store.Log(ex);
 				}
 				DesktopVisibility.ShowAll();
-				MessageBox.Show("已执行任务栏和桌面图标恢复。", "GlassBoard");
+				Native.BroadcastTaskbarCreated();
+				MessageBox.Show("已执行任务栏、托盘图标和桌面图标恢复。", "GlassBoard");
 				return 0;
 			}
 			catch (Exception ex2)

@@ -127,7 +127,7 @@ public class GlassWindow : Window
 		Root.Children.Add(ContentGrid);
 		base.SourceInitialized += delegate
 		{
-			if (this is DockWindow || this is BoardWindow || this is WidgetWindow)
+			if (this is DockWindow || this is BoardWindow || this is WidgetWindow || this is TrayBarWindow)
 			{
 				DesktopWindowPolicy.Apply(this);
 				DesktopPersistence.Attach(this);

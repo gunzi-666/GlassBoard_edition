@@ -38,6 +38,8 @@ public class Controller
 
 	private WidgetManager widgets;
 
+	private TrayBarWindow trayBar;
+
 	private bool removalMigrated;
 
 	private bool glassSuppressed;
@@ -1222,6 +1224,59 @@ public class Controller
 		ApplyFullscreenHide();
 	}
 
+	public void SetTrayBar(bool enabled)
+	{
+		Prefs.Dock.TrayBar = enabled;
+		Save();
+		SyncTrayBar();
+	}
+
+	public void SyncTrayBar()
+	{
+		if (!persistConfiguration || ShuttingDown || !Prefs.Dock.TrayBar)
+		{
+			StopTrayBar();
+			return;
+		}
+		if (trayBar == null)
+		{
+			try
+			{
+				trayBar = TrayBarWindow.Start(this);
+			}
+			catch (Exception ex)
+			{
+				Store.Log(ex);
+				Prefs.Dock.TrayBar = false;
+				Save();
+				System.Windows.MessageBox.Show("托盘条启动失败，已恢复使用系统托盘。\n" + ex.Message, "GlassBoard");
+				return;
+			}
+		}
+		trayBar.ApplyLook();
+		trayBar.Place();
+		if (glassSuppressed)
+		{
+			trayBar.Hide();
+		}
+		else
+		{
+			trayBar.Show();
+		}
+	}
+
+	public void RefreshTrayBarLook()
+	{
+		trayBar?.ApplyLook();
+	}
+
+	private void StopTrayBar()
+	{
+		TrayBarWindow bar = trayBar;
+		trayBar = null;
+		bar?.Release();
+	}
+
 	public void ApplyFullscreenHide()
 	{
 		Dock.GamePolling(enabled: true);
@@ -1240,6 +1295,7 @@ public class Controller
 			{
 				widgets.SetVisible(visible: false);
 			}
+			trayBar?.Hide();
 		}
 		else
 		{
@@ -1249,6 +1305,7 @@ public class Controller
 			{
 				widgets.SetVisible(visible: true);
 			}
+			trayBar?.Show();
 		}
 		if (Tray != null)
 		{
@@ -1300,6 +1357,7 @@ public class Controller
 			Dock.Show();
 		}
 		RefreshWidgets();
+		SyncTrayBar();
 		if (!Prefs.Imported)
 		{
 			Toggle(force: true);
@@ -2075,6 +2133,7 @@ public class Controller
 					draft.Normalize();
 					Prefs.Dock = draft.Copy();
 					Save();
+					SyncTrayBar();
 					if (!preview.IsEnabled)
 					{
 						preview.Start();
@@ -2382,6 +2441,11 @@ public class Controller
 			func3(stackPanel3, "悬停预览显示窗口实时缩略图（关闭则只列出标题）", draft.HoverThumbnails, delegate(bool hoverThumbnails)
 			{
 				draft.HoverThumbnails = hoverThumbnails;
+				live();
+			});
+			func3(stackPanel3, "接管系统托盘，显示为可拖动的托盘条（实验；开启期间 Windows 任务栏托盘不再更新，退出后恢复）", draft.TrayBar, delegate(bool trayBarEnabled)
+			{
+				draft.TrayBar = trayBarEnabled;
 				live();
 			});
 			func3(stackPanel3, "Dock 自动隐藏，靠近所在屏幕底边唤出", draft.AutoHide, delegate(bool autoHide)
@@ -2903,6 +2967,14 @@ public class Controller
 		catch (Exception ex4)
 		{
 			Store.Log(ex4);
+		}
+		try
+		{
+			StopTrayBar();
+		}
+		catch (Exception ex5)
+		{
+			Store.Log(ex5);
 		}
 		if (Tray != null)
 		{
