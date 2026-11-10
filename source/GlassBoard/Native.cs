@@ -38,6 +38,21 @@ public static class Native
 	[DllImport("user32.dll", SetLastError = true)]
 	private static extern bool PostMessage(IntPtr h, int message, IntPtr w, IntPtr l);
 
+	[DllImport("user32.dll", CharSet = CharSet.Unicode)]
+	private static extern int RegisterWindowMessage(string name);
+
+	[DllImport("user32.dll")]
+	private static extern bool SendNotifyMessage(IntPtr h, int message, IntPtr w, IntPtr l);
+
+	public static void BroadcastTaskbarCreated()
+	{
+		int message = RegisterWindowMessage("TaskbarCreated");
+		if (message != 0)
+		{
+			SendNotifyMessage((IntPtr)65535, message, IntPtr.Zero, IntPtr.Zero);
+		}
+	}
+
 	public static bool RequestRestore()
 	{
 		return PostToDock(RestoreMessage);

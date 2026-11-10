@@ -2331,6 +2331,7 @@ public class DockWindow : GlassWindow
 		System.Windows.Media.Color color = Accent();
 		Surface.BorderBrush = ((GlassPercent == 0.0) ? ((System.Windows.Media.Brush)System.Windows.Media.Brushes.Transparent) : ((System.Windows.Media.Brush)new LinearGradientBrush(System.Windows.Media.Color.FromArgb((byte)Math.Min(255.0, 160.0 * EdgeStrength), color.R, color.G, color.B), System.Windows.Media.Color.FromArgb((byte)Math.Min(255.0, 30.0 * EdgeStrength), byte.MaxValue, byte.MaxValue, byte.MaxValue), 90.0)));
 		UpdateRunning();
+		C.RefreshTrayBarLook();
 		if (!capture)
 		{
 			AnimateDockLayout(left, width);

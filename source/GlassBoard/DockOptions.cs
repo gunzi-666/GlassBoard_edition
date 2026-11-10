@@ -68,6 +68,9 @@ public class DockOptions
 	public bool HoverThumbnails = true;
 
 	[DataMember]
+	public bool TrayBar;
+
+	[DataMember]
 	public bool SpringReveal = true;
 
 	[DataMember]
@@ -131,6 +134,7 @@ public class DockOptions
 		ShowRunning = true;
 		HoverWindowList = true;
 		HoverThumbnails = true;
+		TrayBar = false;
 		SpringReveal = true;
 		ShowShortcutOverlays = false;
 		SharperIcons = false;

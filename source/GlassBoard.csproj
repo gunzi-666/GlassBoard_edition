@@ -33,4 +33,17 @@
     <Reference Include="UIAutomationClient" />
     <Reference Include="UIAutomationTypes" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="ManagedShell" Version="0.0.374" />
+  </ItemGroup>
+  <!-- 更新白名单不允许新增文件，NuGet 依赖全部嵌入 GlassBoard.exe，运行时由 EmbeddedAssemblies 释放加载 -->
+  <Target Name="EmbedPackageAssemblies" AfterTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <PackageCopyLocal Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.NuGetPackageId)' != ''" />
+      <EmbeddedResource Include="@(PackageCopyLocal)" Condition="'%(PackageCopyLocal.Extension)' == '.dll'">
+        <LogicalName>runtime/%(PackageCopyLocal.Filename)%(PackageCopyLocal.Extension)</LogicalName>
+      </EmbeddedResource>
+      <ReferenceCopyLocalPaths Remove="@(PackageCopyLocal)" />
+    </ItemGroup>
+  </Target>
 </Project>
