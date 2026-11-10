@@ -99,6 +99,16 @@ public class DockWindow : GlassWindow
 
 	private DateTime hoverLeftAt;
 
+	private readonly List<KeyValuePair<FrameworkElement, IntPtr>> hoverThumbnails = new List<KeyValuePair<FrameworkElement, IntPtr>>();
+
+	private EventHandler hoverThumbnailLayout;
+
+	private int shellHookMessage;
+
+	private bool runningRefreshPending;
+
+	private DispatcherTimer shellRefreshTimer = new DispatcherTimer();
+
 	private Controller C;
 
 	private StackPanel Items = new StackPanel
@@ -1389,7 +1399,8 @@ public class DockWindow : GlassWindow
 	{
 		owner.MouseEnter += delegate
 		{
-			if (HoverWindowsOpen && hoverOwner != owner)
+			bool switching = HoverWindowsOpen && hoverOwner != owner;
+			if (switching)
 			{
 				CloseHoverWindows();
 			}
@@ -1398,7 +1409,14 @@ public class DockWindow : GlassWindow
 				hoverOwner = owner;
 				hoverWindows = windows;
 				hoverOpenTimer.Stop();
-				hoverOpenTimer.Start();
+				if (switching)
+				{
+					OpenHoverWindows();
+				}
+				else
+				{
+					hoverOpenTimer.Start();
+				}
 			}
 		};
 		owner.MouseLeave += delegate
@@ -1425,13 +1443,249 @@ public class DockWindow : GlassWindow
 			return;
 		}
 		List<RunningWindow> list = windows();
-		if (list.Count < 2)
+		bool thumbnails = C.Prefs.Dock.HoverThumbnails && list.Count <= MaxHoverThumbnails() && WindowPreview.ThumbnailsAvailable();
+		if (list.Count < (thumbnails ? 1 : 2))
 		{
 			return;
 		}
 		bool light = C.Prefs.Light;
 		System.Windows.Media.Brush ink = Polish.Ink(light);
 		System.Windows.Media.Brush hover = Polish.Color(light ? "#DFEAFE" : "#3A5074");
+		Popup popup = new Popup
+		{
+			AllowsTransparency = true,
+			StaysOpen = true,
+			Focusable = false,
+			Placement = PlacementMode.Custom,
+			CustomPopupPlacementCallback = (System.Windows.Size popupSize, System.Windows.Size targetSize, System.Windows.Point offset) => new CustomPopupPlacement[1]
+			{
+				new CustomPopupPlacement(new System.Windows.Point((targetSize.Width - popupSize.Width) / 2.0, 0.0 - popupSize.Height - 6.0), PopupPrimaryAxis.Horizontal)
+			},
+			PlacementTarget = owner,
+			PopupAnimation = (thumbnails ? PopupAnimation.None : PopupAnimation.Fade),
+			Child = new Border
+			{
+				Background = Polish.Color(light ? "#FAFCFF" : "#202B3D"),
+				BorderBrush = Polish.Color(light ? "#CFD7E5" : "#48566D"),
+				BorderThickness = new Thickness(1.0),
+				CornerRadius = new CornerRadius(10.0),
+				Padding = new Thickness(5.0),
+				SnapsToDevicePixels = true,
+				Child = (thumbnails ? HoverThumbnailCards(list, light, ink, hover) : HoverTitleRows(list, ink, hover))
+			}
+		};
+		if (thumbnails)
+		{
+			popup.Opened += delegate
+			{
+				AttachHoverThumbnails(popup);
+			};
+		}
+		hoverPopup = popup;
+		hoverLeftAt = DateTime.MinValue;
+		popup.IsOpen = true;
+		hoverCloseTimer.Start();
+	}
+
+	private int MaxHoverThumbnails()
+	{
+		Rect rect = DesktopWindowPolicy.WorkArea(this, pointer: true);
+		return Math.Max(1, (int)((rect.Width - 24.0) / 224.0));
+	}
+
+	private FrameworkElement HoverThumbnailCards(List<RunningWindow> list, bool light, System.Windows.Media.Brush ink, System.Windows.Media.Brush hover)
+	{
+		StackPanel cards = new StackPanel
+		{
+			Orientation = System.Windows.Controls.Orientation.Horizontal
+		};
+		System.Windows.Media.Brush frame = Polish.Color(light ? "#EEF2F8" : "#18202D");
+		System.Windows.Media.Brush closeHover = Polish.Color("#E81123");
+		foreach (RunningWindow window in list)
+		{
+			RunningWindow selected = window;
+			Grid header = new Grid
+			{
+				Height = 22.0
+			};
+			header.Children.Add(new System.Windows.Controls.Image
+			{
+				Source = RunningWindows.Icon(selected),
+				Width = 16.0,
+				Height = 16.0,
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+				VerticalAlignment = VerticalAlignment.Center
+			});
+			header.Children.Add(new TextBlock
+			{
+				Text = (string.IsNullOrWhiteSpace(selected.Title) ? "未命名窗口" : selected.Title),
+				Foreground = ink,
+				FontSize = 12.0,
+				Margin = new Thickness(22.0, 0.0, 24.0, 0.0),
+				TextTrimming = TextTrimming.CharacterEllipsis,
+				VerticalAlignment = VerticalAlignment.Center
+			});
+			TextBlock closeMark = new TextBlock
+			{
+				Text = "✕",
+				FontSize = 11.0,
+				Foreground = ink,
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				VerticalAlignment = VerticalAlignment.Center
+			};
+			Border close = new Border
+			{
+				Width = 22.0,
+				Height = 22.0,
+				CornerRadius = new CornerRadius(4.0),
+				Background = System.Windows.Media.Brushes.Transparent,
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+				Visibility = Visibility.Hidden,
+				ToolTip = "关闭窗口",
+				Child = closeMark
+			};
+			close.MouseEnter += delegate
+			{
+				close.Background = closeHover;
+				closeMark.Foreground = System.Windows.Media.Brushes.White;
+			};
+			close.MouseLeave += delegate
+			{
+				close.Background = System.Windows.Media.Brushes.Transparent;
+				closeMark.Foreground = ink;
+			};
+			close.MouseLeftButtonUp += delegate(object s, MouseButtonEventArgs e)
+			{
+				e.Handled = true;
+				CloseHoverWindows();
+				WindowPreview.Close(selected.Handle);
+				ScheduleRunningRefresh(400);
+			};
+			header.Children.Add(close);
+			Border host = new Border
+			{
+				Width = 200.0,
+				Height = 120.0,
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				VerticalAlignment = VerticalAlignment.Center,
+				Tag = selected.Handle
+			};
+			StackPanel body = new StackPanel();
+			body.Children.Add(header);
+			body.Children.Add(new Border
+			{
+				Width = 200.0,
+				Height = 120.0,
+				Margin = new Thickness(0.0, 6.0, 0.0, 0.0),
+				CornerRadius = new CornerRadius(4.0),
+				Background = frame,
+				Child = host
+			});
+			Border card = new Border
+			{
+				Background = System.Windows.Media.Brushes.Transparent,
+				CornerRadius = new CornerRadius(7.0),
+				Padding = new Thickness(8.0, 6.0, 8.0, 8.0),
+				Width = 216.0,
+				Cursor = System.Windows.Input.Cursors.Hand,
+				ToolTip = selected.Title,
+				Child = body
+			};
+			card.MouseEnter += delegate
+			{
+				card.Background = hover;
+				close.Visibility = Visibility.Visible;
+			};
+			card.MouseLeave += delegate
+			{
+				card.Background = System.Windows.Media.Brushes.Transparent;
+				close.Visibility = Visibility.Hidden;
+			};
+			card.MouseLeftButtonUp += delegate
+			{
+				CloseHoverWindows();
+				ActivateTask(selected.Handle);
+			};
+			cards.Children.Add(card);
+		}
+		return cards;
+	}
+
+	private void AttachHoverThumbnails(Popup popup)
+	{
+		if (hoverPopup != popup || !(popup.Child is FrameworkElement child) || !(PresentationSource.FromVisual(child) is HwndSource hwndSource))
+		{
+			return;
+		}
+		Matrix device = hwndSource.CompositionTarget.TransformToDevice;
+		foreach (Border host in FindHosts(child))
+		{
+			IntPtr thumbnail = WindowPreview.Register(hwndSource.Handle, (IntPtr)host.Tag);
+			if (thumbnail == IntPtr.Zero)
+			{
+				continue;
+			}
+			hoverThumbnails.Add(new KeyValuePair<FrameworkElement, IntPtr>(host, thumbnail));
+			if (WindowPreview.SourceSize(thumbnail, out var width, out var height))
+			{
+				double scale = Math.Min(1.0, Math.Min(200.0 * device.M11 / (double)width, 120.0 * device.M22 / (double)height));
+				host.Width = Math.Max(1.0, (double)width * scale / device.M11);
+				host.Height = Math.Max(1.0, (double)height * scale / device.M22);
+			}
+		}
+		hoverThumbnailLayout = delegate
+		{
+			PlaceHoverThumbnails(hwndSource, device);
+		};
+		child.LayoutUpdated += hoverThumbnailLayout;
+		child.UpdateLayout();
+		PlaceHoverThumbnails(hwndSource, device);
+	}
+
+	private static IEnumerable<Border> FindHosts(DependencyObject root)
+	{
+		int count = VisualTreeHelper.GetChildrenCount(root);
+		for (int i = 0; i < count; i++)
+		{
+			DependencyObject child = VisualTreeHelper.GetChild(root, i);
+			if (child is Border border && border.Tag is IntPtr)
+			{
+				yield return border;
+			}
+			foreach (Border item in FindHosts(child))
+			{
+				yield return item;
+			}
+		}
+	}
+
+	private void PlaceHoverThumbnails(HwndSource hwndSource, Matrix device)
+	{
+		if (hwndSource.IsDisposed || hwndSource.RootVisual == null)
+		{
+			return;
+		}
+		foreach (KeyValuePair<FrameworkElement, IntPtr> hoverThumbnail in hoverThumbnails)
+		{
+			FrameworkElement host = hoverThumbnail.Key;
+			if (!host.IsVisible || !hwndSource.RootVisual.IsAncestorOf(host))
+			{
+				WindowPreview.Place(hoverThumbnail.Value, default(WindowPreview.RECT), visible: false);
+				continue;
+			}
+			Rect rect = host.TransformToAncestor(hwndSource.RootVisual).TransformBounds(new Rect(0.0, 0.0, host.ActualWidth, host.ActualHeight));
+			WindowPreview.Place(hoverThumbnail.Value, new WindowPreview.RECT
+			{
+				Left = (int)Math.Round(rect.Left * device.M11),
+				Top = (int)Math.Round(rect.Top * device.M22),
+				Right = (int)Math.Round(rect.Right * device.M11),
+				Bottom = (int)Math.Round(rect.Bottom * device.M22)
+			}, visible: true);
+		}
+	}
+
+	private FrameworkElement HoverTitleRows(List<RunningWindow> list, System.Windows.Media.Brush ink, System.Windows.Media.Brush hover)
+	{
 		StackPanel rows = new StackPanel();
 		foreach (RunningWindow window in list)
 		{
@@ -1481,36 +1735,13 @@ public class DockWindow : GlassWindow
 			};
 			rows.Children.Add(row);
 		}
-		Popup popup = new Popup
+		return new ScrollViewer
 		{
-			AllowsTransparency = true,
-			StaysOpen = true,
-			Focusable = false,
-			Placement = PlacementMode.Top,
-			PlacementTarget = owner,
-			VerticalOffset = -6.0,
-			PopupAnimation = PopupAnimation.Fade,
-			Child = new Border
-			{
-				Background = Polish.Color(light ? "#FAFCFF" : "#202B3D"),
-				BorderBrush = Polish.Color(light ? "#CFD7E5" : "#48566D"),
-				BorderThickness = new Thickness(1.0),
-				CornerRadius = new CornerRadius(10.0),
-				Padding = new Thickness(5.0),
-				SnapsToDevicePixels = true,
-				Child = new ScrollViewer
-				{
-					MaxHeight = 420.0,
-					VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-					HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-					Content = rows
-				}
-			}
+			MaxHeight = 420.0,
+			VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+			HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+			Content = rows
 		};
-		hoverPopup = popup;
-		hoverLeftAt = DateTime.MinValue;
-		popup.IsOpen = true;
-		hoverCloseTimer.Start();
 	}
 
 	private void TrackHoverWindows()
@@ -1561,9 +1792,68 @@ public class DockWindow : GlassWindow
 		hoverPopup = null;
 		hoverOwner = null;
 		hoverWindows = null;
+		foreach (KeyValuePair<FrameworkElement, IntPtr> hoverThumbnail in hoverThumbnails)
+		{
+			WindowPreview.Unregister(hoverThumbnail.Value);
+		}
+		hoverThumbnails.Clear();
+		if (hoverThumbnailLayout != null && popup?.Child is FrameworkElement child)
+		{
+			child.LayoutUpdated -= hoverThumbnailLayout;
+		}
+		hoverThumbnailLayout = null;
 		if (popup != null)
 		{
 			popup.IsOpen = false;
+			if (runningRefreshPending)
+			{
+				ScheduleRunningRefresh(150);
+			}
+		}
+	}
+
+	private void OnShellHook(int code)
+	{
+		switch (code)
+		{
+		case WindowPreview.HSHELL_WINDOWCREATED:
+		case WindowPreview.HSHELL_WINDOWDESTROYED:
+		case WindowPreview.HSHELL_WINDOWREPLACED:
+			ScheduleRunningRefresh(150);
+			break;
+		case WindowPreview.HSHELL_REDRAW:
+			ScheduleRunningRefresh(800);
+			break;
+		}
+	}
+
+	private void ScheduleRunningRefresh(int delay)
+	{
+		runningRefreshPending = true;
+		TimeSpan timeSpan = TimeSpan.FromMilliseconds(delay);
+		if (!shellRefreshTimer.IsEnabled || shellRefreshTimer.Interval > timeSpan)
+		{
+			shellRefreshTimer.Stop();
+			shellRefreshTimer.Interval = timeSpan;
+			shellRefreshTimer.Start();
+		}
+	}
+
+	private void RefreshRunningState()
+	{
+		if (C.GlassSuppressed || (!base.IsVisible && !C.Board.IsVisible) || (!C.Prefs.Dock.ShowRunning && !taskWheel.Running))
+		{
+			return;
+		}
+		runningRefreshPending = false;
+		lastRunningScan = DateTime.UtcNow;
+		RunningWindows.Scan();
+		RefreshTaskSnapshot();
+		UpdateRunning();
+		C.Board.UpdateRunning();
+		if (taskWheel.Running && taskSignature != TaskSignature())
+		{
+			runningRefreshPending = true;
 		}
 	}
 
@@ -1761,20 +2051,23 @@ public class DockWindow : GlassWindow
 		{
 			ReleaseCancelledExternalDrag();
 			C.CheckFullscreen();
-			if (!C.GlassSuppressed && (base.IsVisible || C.Board.IsVisible) && (C.Prefs.Dock.ShowRunning || taskWheel.Running) && !((DateTime.UtcNow - lastRunningScan).TotalSeconds < (double)(renderedHidden ? 10 : 3)))
+			double fallback = ((shellHookMessage == 0) ? (renderedHidden ? 10 : 3) : (renderedHidden ? 30 : 15));
+			if (runningRefreshPending ? (!shellRefreshTimer.IsEnabled) : ((DateTime.UtcNow - lastRunningScan).TotalSeconds >= fallback))
 			{
-				lastRunningScan = DateTime.UtcNow;
-				RunningWindows.Scan();
-				RefreshTaskSnapshot();
-				UpdateRunning();
-				C.Board.UpdateRunning();
+				RefreshRunningState();
 			}
 		};
 		runningTimer.Start();
+		shellRefreshTimer.Tick += delegate
+		{
+			shellRefreshTimer.Stop();
+			RefreshRunningState();
+		};
 		base.SourceInitialized += delegate
 		{
 			source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
 			source.AddHook(Hook);
+			shellHookMessage = WindowPreview.RegisterShellHook(source.Handle);
 		};
 		System.Windows.Controls.ContextMenu contextMenu = MenuTheme.Create(C.Prefs.Light);
 		System.Windows.Controls.MenuItem menuItem = new System.Windows.Controls.MenuItem
@@ -1823,13 +2116,24 @@ public class DockWindow : GlassWindow
 		CancelDockPointer(refresh: false);
 		autoTimer.Stop();
 		runningTimer.Stop();
+		shellRefreshTimer.Stop();
 		taskHintTimer.Stop();
 		CloseHoverWindows();
+		if (shellHookMessage != 0 && source != null && !source.IsDisposed)
+		{
+			WindowPreview.UnregisterShellHook(source.Handle);
+		}
+		shellHookMessage = 0;
 		SystemEvents.DisplaySettingsChanged -= DisplayChanged;
 	}
 
 	private IntPtr Hook(IntPtr h, int msg, IntPtr w, IntPtr l, ref bool handled)
 	{
+		if (shellHookMessage != 0 && msg == shellHookMessage)
+		{
+			OnShellHook((int)w.ToInt64());
+			return IntPtr.Zero;
+		}
 		switch (msg)
 		{
 		case Native.RestoreMessage:

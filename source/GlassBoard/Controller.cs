@@ -2374,9 +2374,14 @@ public class Controller
 				draft.ShowRunning = showRunning;
 				live();
 			});
-			func3(stackPanel3, "鼠标悬停时列出该软件的多个窗口，点击切换", draft.HoverWindowList, delegate(bool hoverWindowList)
+			func3(stackPanel3, "鼠标悬停时预览该软件的窗口，点击切换", draft.HoverWindowList, delegate(bool hoverWindowList)
 			{
 				draft.HoverWindowList = hoverWindowList;
+				live();
+			});
+			func3(stackPanel3, "悬停预览显示窗口实时缩略图（关闭则只列出标题）", draft.HoverThumbnails, delegate(bool hoverThumbnails)
+			{
+				draft.HoverThumbnails = hoverThumbnails;
 				live();
 			});
 			func3(stackPanel3, "Dock 自动隐藏，靠近所在屏幕底边唤出", draft.AutoHide, delegate(bool autoHide)

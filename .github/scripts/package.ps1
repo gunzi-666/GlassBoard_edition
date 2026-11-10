@@ -9,6 +9,7 @@ Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $build = Join-Path $root 'source\bin\Release\net48'
+$updaterBuild = Join-Path $root 'source\GlassBoard.Updater\bin\Release\net48'
 
 $rules = Get-Content -Raw -LiteralPath (Join-Path $root 'source\GlassBoard\UpdateRules.cs')
 $configured = [regex]::Match($rules, 'RepositoryPath\s*=\s*"([^"]+)"').Groups[1].Value
@@ -20,7 +21,7 @@ if ($configured -ne $Repository) {
 $files = [ordered]@{
     'GlassBoard.exe'                 = Join-Path $build 'GlassBoard.exe'
     'GlassBoard.exe.config'          = Join-Path $build 'GlassBoard.exe.config'
-    'GlassBoard.Updater.exe'         = Join-Path $root 'GlassBoard.Updater.exe'
+    'GlassBoard.Updater.exe'         = Join-Path $updaterBuild 'GlassBoard.Updater.exe'
     'Interop.UIAutomationClient.dll' = Join-Path $root 'Interop.UIAutomationClient.dll'
     'README.md'                      = Join-Path $root 'README.md'
     'THIRD_PARTY_NOTICES.md'         = Join-Path $root 'THIRD_PARTY_NOTICES.md'

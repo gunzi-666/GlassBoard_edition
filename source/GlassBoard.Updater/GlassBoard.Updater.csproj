@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>GlassBoard.Updater</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>12.0</LangVersion>
+    <RootNamespace>GlassBoard</RootNamespace>
+    <Product>GlassBoard</Product>
+    <AssemblyTitle>GlassBoard 更新助手</AssemblyTitle>
+    <ApplicationIcon>..\app.ico</ApplicationIcon>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="..\GlassBoard\UpdateApply.cs" Link="Shared\UpdateApply.cs" />
+    <Compile Include="..\GlassBoard\UpdatePlan.cs" Link="Shared\UpdatePlan.cs" />
+    <Compile Include="..\GlassBoard\UpdateRules.cs" Link="Shared\UpdateRules.cs" />
+    <Compile Include="..\GlassBoard\UpdateOffer.cs" Link="Shared\UpdateOffer.cs" />
+    <Compile Include="..\GlassBoard\UpdateRelease.cs" Link="Shared\UpdateRelease.cs" />
+    <Compile Include="..\GlassBoard\UpdateAsset.cs" Link="Shared\UpdateAsset.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Runtime.Serialization" />
+  </ItemGroup>
+</Project>

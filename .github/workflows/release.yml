@@ -60,6 +60,8 @@ jobs:
         run: |
           dotnet restore source/GlassBoard.csproj --source https://api.nuget.org/v3/index.json
           dotnet build source/GlassBoard.csproj -c Release --no-restore
+          dotnet restore source/GlassBoard.Updater/GlassBoard.Updater.csproj --source https://api.nuget.org/v3/index.json
+          dotnet build source/GlassBoard.Updater/GlassBoard.Updater.csproj -c Release --no-restore -p:Version=${{ steps.ver.outputs.version }}
 
       - name: 打包
         id: pkg

@@ -280,6 +280,12 @@ dotnet build GlassBoard.csproj -c Release
 
 需要 .NET SDK 8 或更高。产物在 `source\bin\Release\net48\GlassBoard.exe`。
 
+更新助手 `GlassBoard.Updater.exe` 由 `source\GlassBoard.Updater` 编译，与主程序共用 `UpdateApply.cs` 等更新校验代码：
+
+```bat
+dotnet build source\GlassBoard.Updater\GlassBoard.Updater.csproj -c Release
+```
+
 替换运行时只需把新的 `GlassBoard.exe` 覆盖到程序目录，**不要**只把这个 exe 放进空文件夹——
 程序还需要同目录下的 `Interop.UIAutomationClient.dll`、`data\`、`src\` 和 `GlassBoard.Updater.exe`。
 
